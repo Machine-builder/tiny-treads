@@ -1,4 +1,4 @@
-from scripts.client import ClientGame
+from scripts import engine
 
-game = ClientGame()
+game = engine.client.ClientGame()
 game.run()

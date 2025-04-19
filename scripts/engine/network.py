@@ -54,8 +54,8 @@ class Utility():
         return ipv4
 
     @staticmethod
-    def random_identifier(length:int=12):
-        """generate a random id with a certain length"""
+    def random_identifier(length:int=8):
+        """generate a random id with a given length"""
         return "".join(
             random.choice(Constants.RANDOM_ID_CHARS)\
             for _ in range(length))
@@ -518,8 +518,7 @@ class HSystem():
                 client_model=self.client_model)
             self.clients[cid] = client
             self.cid_by_conn[conn] = cid
-            self.send_event_tcp(Event(
-                HEvents.INIT_A, cid=cid), conn)
+            self.send_event_tcp(Event(HEvents.INIT_A, cid=cid), conn)
             print(f"HS:INIT Client handshake begun... {client.addr_tcp} -> Assigned CID: {cid}")
 
         for conn, addr in d_clients_tcp:
@@ -554,9 +553,7 @@ class HSystem():
                 client = self.clients[event.cid]
                 client.addr_udp = addr
                 # client is now ready
-                self.send_event_tcp(Event(
-                    HEvents.INIT_C), client.conn)
-                print(f"HS:INIT Client ready!.. {event.cid}")
+                self.send_event_tcp(Event(HEvents.INIT_C), client.conn)
                 result.new_clients.append(client)
             else:
                 if client is None:
