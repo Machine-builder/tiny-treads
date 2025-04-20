@@ -1,13 +1,13 @@
 import time
-from scripts import engine
 
-import logging
+import pygame
+from scripts import engine, packets
 
 server_ip = engine.network.Utility.get_local_ip()
 server_port_tcp = 9183
 server_port_udp = 9184
 
-packet_handler = engine.network.get_default_hybrid_packet_handler()
+packet_handler = packets.get_packet_handler()
 
 client = engine.network.HClient(
     server_ip,
@@ -38,6 +38,9 @@ while connection_status != -1:
             now = time.time()
             rtt = now - ping_start
             print(f'Connection RTT: {int(rtt*1000)}ms')
+            
+            client.send_event_tcp(engine.network.Event(301, 9281, "tank"))
+            client.send_event_tcp(engine.network.Event(304, 9281, pygame.Vector2(100.5, 200.25), pygame.Vector2(99.4, 25.2), 45.0, 0.0))
     
     for e in r.events_udp:
         print('tcp', e.type, e.args)

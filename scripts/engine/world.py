@@ -1,76 +1,96 @@
+import random
 import time
 from typing import Dict, List, Set, Tuple
 
 import pygame
 
-from .entity import Entity
+from .entity import Entity, EntityRenderer
 from . import network
+from .. import packets
 
 class World():
     entities: Dict[str, Entity]
+    local_entities: Set[str]
     
-    _network_authority_entities: Set[str]
-    
-    def __init__(self):
+    def __init__(self, is_server: bool = False):
+        self.is_server = is_server
         self.entities = {}
-        self._network_authority_entities = set()
-        self.last_network_pump = time.time()
-    
-    def add_entity(self, entity: Entity, network_authortiy: bool = False):
-        if entity.uid in self.entities: return
-        self.entities[entity.uid] = entity
-        if network_authortiy:
-            self.set_entity_network_authority(entity, True)
-    
-    def remove_entity(self, entity_uid: str):
-        if not entity_uid in self.entities: return
-        del self.entities[entity_uid]
-        if entity_uid in self._network_authority_entities:
-            self._network_authority_entities.remove(entity_uid)
-    
-    def set_entity_network_authority(self, entity: Entity, value: bool):
-        entity_is_network_authority = entity.uid in self._network_authority_entities
-        if value and not entity_is_network_authority:
-            self._network_authority_entities.add(entity.uid)
-        elif not value and entity_is_network_authority:
-            self._network_authority_entities.remove(entity.uid)
+        self.local_entities = set()
     
     def handle_network_event(self, event: network.Event):
-        try:
-            if event.event == 'ENTITY:CREATE':
-                e = Entity.from_creation_event(event)
-                self.add_entity(e)
-            elif event.event == 'ENTITY:ATTRIBUTES':
-                e = self.entities[event.uid]
-                if not e.uid in self._network_authority_entities:
-                    e.update_attributes(**event.attributes)
-        except:
-            pass
-    
-    def pump_network_events(self, as_client: bool = False) -> Tuple[List[network.Event], List[network.Event]]:
-        # Ensure we only send network events once per tick to not spam the server
-        now = time.time()
-        if now < self.last_network_pump+0.05:
-            return [], []
+        if event.type == packets.PacketDefinitions.EntityCreate:
+            id, type_id = event.args
+            print(f'Create entity {id}')
+            entity = Entity(self, pygame.Vector2(50, 50), pygame.Vector2(32, 32), EntityRenderer())
+            entity.id = id
+            self.create_entity(entity, False)
         
-        self.last_network_pump = now
+        elif event.type == packets.PacketDefinitions.EntityDestroy:
+            id, = event.args
+            self.destroy_entity(id)
+    
+        elif event.type == packets.PacketDefinitions.EntityUpdatePhys:
+            id, position, velocity, rotation, rotational_velocity = event.args
+            if not self.is_server and id in self.local_entities:
+                return # Do not update if this is client-controlled
+            entity = self.entities.get(id)
+            if entity is None: return
+            entity.position = position
+            entity.velocity = velocity
+            entity.rotation = rotation
+            entity.rotational_velocity = rotational_velocity
+            # These attributes should be saved to the snapshot buffer instead of immediately applied
+    
+    def assign_new_entity_id(self) -> int:
+        id = -1
+        while id == -1 or id in self.entities:
+            id = random.randint(0, 65535)
+        return id
+    
+    def create_entity(self, entity: Entity, is_local: bool = False):
+        self.entities[entity.id] = entity
+        if is_local:
+            self.local_entities.add(entity.id)
+        
+    def destroy_entity(self, entity_id: int):
+        if not entity_id in self.entities: return
+        del self.entities[entity_id]
+        self.local_entities.discard(entity_id)
+    
+    def set_entity_local(self, entity_id: int, value: bool):
+        if value: self.local_entities.add(entity_id)
+        else: self.local_entities.discard(entity_id)
+    
+    def pump_network_events(self) -> Tuple[List[network.Event], List[network.Event]]:
         events_tcp = []
         events_udp = []
-        entities = [self.entities[uid] for uid in self._network_authority_entities] if as_client else self.entities.values()
-        for entity in entities:
-            attrs = entity.get_attributes_dict()
-            del attrs['velocity']
+        
+        for entity_id in self.local_entities:
+            entity = self.entities.get(entity_id)
+            if entity is None: continue
             events_udp.append(network.Event(
-                'ENTITY:ATTRIBUTES',
-                uid=entity.uid,
-                attributes=attrs
+                packets.PacketDefinitions.EntityUpdatePhys,
+                entity_id,
+                entity.position,
+                entity.velocity,
+                entity.rotation,
+                entity.rotational_velocity
             ))
         
         return events_tcp, events_udp
     
     def update(self, dt: float):
-        for entity in self.entities.values():
-            entity.update(dt)
+        # some entities should be interpolated not use proper physics
+        # have a way to specify this
+        if self.is_server:
+            for entity in self.entities.values():
+                entity.update(dt)
+        else:
+            for entity in self.entities.values():
+                if entity.id in self.local_entities:
+                    entity.update(dt)
+                else:
+                    entity.update_visuals(dt) # These visuals should be interpolated from snapshot buffer
     
     def draw(self, surface: pygame.Surface):
         for entity in self.entities.values():

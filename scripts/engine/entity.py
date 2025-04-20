@@ -1,14 +1,18 @@
 import random
 import string
+import typing
 from typing import Any, Dict, Union
 import pygame
 
 from . import network
 from .entity_renderer import EntityRenderer
 
-uid_chars = string.ascii_letters+string.digits
-def create_entity_uid():
-    return ''.join([random.choice(uid_chars) for _ in range(16)])
+if typing.TYPE_CHECKING:
+    from .world import World
+
+id_chars = string.ascii_letters+string.digits
+def create_entity_id():
+    return ''.join([random.choice(id_chars) for _ in range(16)])
 
 class Entity():
     position: pygame.Vector2
@@ -20,14 +24,18 @@ class Entity():
     
     def __init__(
             self,
+            world: "World",
             position: pygame.Vector2,
             size: pygame.Vector2,
             renderer: Union[EntityRenderer, None]):
-
-        self.uid = create_entity_uid()
+    
+        self.world = world
+        self.id = self.world.assign_new_entity_id()
         
         self.position = position
         self.velocity = pygame.Vector2(0, 0)
+        self.rotation = 0
+        self.rotational_velocity = 0
         self.drag = 0.1
         self.size = size
         
@@ -43,6 +51,9 @@ class Entity():
     def update(self, dt: float):
         self.position += self.velocity*dt 
         self.velocity -= self.velocity*self.drag*dt
+        self.update_visuals(dt)
+    
+    def update_visuals(self, dt: float):
         self._update_rect_position()
         if self.renderer is not None: self.renderer.update(dt)
     
@@ -73,7 +84,7 @@ class Entity():
         e.velocity = velocity
         e.drag = drag
         
-        e.uid = event.uid
+        e.id = event.id
         
         return e
     

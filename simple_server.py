@@ -1,5 +1,5 @@
 import time
-from scripts import engine
+from scripts import engine, packets
 
 class ClientModel():
     def __init__(self):
@@ -9,7 +9,7 @@ server_ip = engine.network.Utility.get_local_ip()
 server_port_tcp = 9183
 server_port_udp = 9184
 
-packet_handler = engine.network.get_default_hybrid_packet_handler()
+packet_handler = packets.get_packet_handler()
 
 system = engine.network.HSystem(
     server_ip,

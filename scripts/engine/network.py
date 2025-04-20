@@ -82,6 +82,9 @@ class Event:
         self.type = type
         self.args = args
         self.from_connection = None
+    
+    def __repr__(self) -> str:
+        return f'Event<{self.type}, {self.args}>'
         
 
 '''
@@ -100,68 +103,74 @@ packet_handler.add_handler(
 class PacketHandler:
     """Pack and unpack events"""
     
-    handlers: Dict[int, Tuple[Callable, Callable]]
-    
     def __init__(self):
-        self.handlers = {}
-    
+        self.handlers: Dict[int, Union[
+            Tuple[str, Callable, Callable], # Simple (format, pre/postprocess)
+            Tuple[Callable, Callable]       # Custom (packer, unpacker)
+        ]] = {}
+
+    def register(self, id: int):
+        def decorator(func):
+            result = func()
+            # Support both return types
+            if isinstance(result[0], str) or result[0] is None:
+                self.add_handler(id, *result)
+            else:
+                self.handlers[id] = result  # (packer, unpacker)
+            return func
+        return decorator
+
     def add_handler(
-            self,
-            id: int,
-            format: str = None,
-            packer: Callable[[Iterable], bytes] = None,
-            unpacker: Callable[[bytes], Iterable] = None) -> None:
-        if format:
-            packer = packer or (lambda args: struct.pack(format, *args))
-            unpacker = unpacker or (lambda data: struct.unpack(format, data))
-        else:
-            packer = packer or (lambda _: b'')
-            unpacker = unpacker or (lambda _: ())
-        assert not id in self.handlers, f"Handler for id {id} already exists."
-        self.handlers[id] = (packer, unpacker)
-    
+        self,
+        id: int,
+        format: str = None,
+        preprocess: Callable[[Iterable], Iterable] = None,
+        postprocess: Callable[[Iterable], Iterable] = None
+    ) -> None:
+        assert id not in self.handlers, f"Handler for id {id} already exists."
+        self.handlers[id] = (format, preprocess, postprocess)
+
     def pack(self, event: Event) -> bytes:
-        """Pack an event into bytes.
+        if event.type not in self.handlers:
+            raise ValueError(f"No handler for event type {event.type}")
+        handler = self.handlers[event.type]
 
-        Args:
-            event (Event): Event to pack.
+        if isinstance(handler[0], str) or handler[0] is None:
+            # Simple handler (format string or empty)
+            format, preprocess, _ = handler
+            args = event.args if preprocess is None else preprocess(*event.args)
+            body = struct.pack(format, *args) if format else b''
+        else:
+            # Custom packer
+            packer, _ = handler
+            body = packer(*event.args)
 
-        Raises:
-            ValueError: Raised if no packer exists for event type.
-
-        Returns:
-            bytes: Original event, packed as bytes.
-        """
-        if not event.type in self.handlers:
-            raise ValueError(f"No packer for event type {event.type}")
-        packer, _ = self.handlers[event.type]
-        return struct.pack('<H', event.type) + packer(event.args)
+        return struct.pack('<H', event.type) + body
 
     def unpack(self, data: bytes) -> Event:
-        """Unpack bytes into an event
-
-        Args:
-            data (bytes): Bytes to unpack.
-
-        Raises:
-            ValueError: Raised if no unpacker exists for event type.
-
-        Returns:
-            Event: Event unpacked from bytes.
-        """
         type_ = struct.unpack_from('<H', data, 0)[0]
-        if not type_ in self.handlers:
-            raise ValueError(f"No unpacker for event type {type_}")
-        _, unpacker = self.handlers[type_]
-        return Event(type_, *unpacker(data[2:]))
+        if type_ not in self.handlers:
+            raise ValueError(f"No handler for event type {type_}")
+        handler = self.handlers[type_]
+
+        if isinstance(handler[0], str) or handler[0] is None:
+            format, _, postprocess = handler
+            unpacked_args = struct.unpack(format, data[2:]) if format else ()
+            unpacked_args = unpacked_args if postprocess is None else postprocess(*unpacked_args)
+        else:
+            # Custom unpacker
+            _, unpacker = handler
+            unpacked_args = unpacker(data[2:]) # pass data after event type
+
+        return Event(type_, *unpacked_args)
 
 def get_default_hybrid_packet_handler() -> PacketHandler:
     packet_handler = PacketHandler()
 
-    packet_handler.add_handler(1, format='<H')  # init_tcp   (client_id)
-    packet_handler.add_handler(2, format='<H')  # init_udp   (client_id)
-    packet_handler.add_handler(3)               # init_final ()
-    packet_handler.add_handler(4, format='<?')  # rtt_ping   (return?)
+    packet_handler.add_handler(1, '<H')  # init_tcp   (client_id)
+    packet_handler.add_handler(2, '<H')  # init_udp   (client_id)
+    packet_handler.add_handler(3)        # init_final ()
+    packet_handler.add_handler(4, '<?')  # rtt_ping   (return?)
     
     return packet_handler
 

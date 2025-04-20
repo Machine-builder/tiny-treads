@@ -10,7 +10,7 @@ pygame.init()
 
 pygame.display.set_caption('Spritesheet Viewer')
 
-screen = pygame.Surface((256, 256))
+screen = pygame.Surface((128, 128))
 display = pygame.display.set_mode((512, 512))
 
 image_heart = pygame.image.load('./assets/heart.png')
@@ -44,8 +44,8 @@ class Tank:
         image_drive_color = pygame.image.load('./blender/sheets/tank_drive_color.png')
         image_shoot_base = pygame.image.load('./blender/sheets/tank_shoot.png')
         image_shoot_color = pygame.image.load('./blender/sheets/tank_shoot_color.png')
-        image_drive_base.blit(pygame.transform.hsl(image_drive_color, -90, 0.25, 0))
-        image_shoot_base.blit(pygame.transform.hsl(image_shoot_color, -90, 0.25, 0))
+        # image_drive_base.blit(pygame.transform.hsl(image_drive_color, -90, 0.25, 0))
+        # image_shoot_base.blit(pygame.transform.hsl(image_shoot_color, -90, 0.25, 0))
         self.spritesheet_driving = engine.spritesheet.Spritesheet(image_drive_base, (48, 48))
         self.spritesheet_shooting = engine.spritesheet.Spritesheet(image_shoot_base, (48, 48))
         
