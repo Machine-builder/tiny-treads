@@ -1,8 +1,11 @@
 import math
+import random
 import time
 
 import pygame
 from scripts import engine, packets
+from scripts.entity_registry import get_entity_registry
+from scripts.tank import TankEntity
 
 class ClientModel():
     def __init__(self):
@@ -16,39 +19,40 @@ system = engine.network.HSystem(server_ip, server_port_tcp, server_port_udp, Cli
 
 print(f'Server running on {server_ip}:{server_port_tcp}')
 
-world = engine.world.World(is_server=True)
-server_entity = engine.Entity(world, pygame.Vector2(50, 50), pygame.Vector2(32, 32), None)
-world.create_entity(server_entity, True)
+world = engine.world.World(get_entity_registry(), is_server=True)
+# server_entity = engine.Entity(world, pygame.Vector2(50, 50), pygame.Vector2(32, 32), None)
+# server_entity.id = 1
+# world.create_entity(server_entity, True)
 
 elapsed = 0
 ct = 0.0
 while True:
     now = time.time()
-    dt = 0.05
+    dt = 0.1
     ct += dt
     
-    server_entity.position.x = 100+math.sin(ct*10)*20
+    # server_entity.position.x = 100+math.sin(ct*10)*20
     
     r = system.pump()
     
     for client in r.new_clients:
         print('Connected:', client.addr_tcp)
         
-        client_entity = engine.Entity(world, pygame.Vector2(100, 50), pygame.Vector2(32, 32), None)
+        client_entity = TankEntity(-1, world, pygame.Vector2(0, 0), False)
         
         client_model: ClientModel = client.model
         client_model.entity_id = client_entity.id
         
         # Send entities to this new client
         for entity in world.entities.values():
-            e = engine.network.Event(packets.PacketDefinitions.EntityCreate, entity.id, 'typeid')
+            e = engine.network.Event(packets.PacketDefinitions.EntityCreate, entity.id, entity.type_id)
             system.send_event_tcp(e, client.conn)
             
-        world.create_entity(client_entity, True)
+        world.create_entity(client_entity, False)
         
         # Alert all clients of this new entity
         for other_client in system.clients.values():
-            e = engine.network.Event(packets.PacketDefinitions.EntityCreate, client_entity.id, 'typeid')
+            e = engine.network.Event(packets.PacketDefinitions.EntityCreate, client_entity.id, client_entity.type_id)
             system.send_event_tcp(e, other_client.conn)
         
         system.send_event_tcp(engine.network.Event(packets.PacketDefinitions.ClientSetLocalEntity, client_entity.id, True), client.conn)
@@ -79,7 +83,7 @@ while True:
         system.send_event_udp(event)
     
     elapsed = time.time() - now
-    added_delay = 0.05 - elapsed
+    added_delay = 0.1 - elapsed
     if added_delay > 0:
         time.sleep(added_delay)
     else:

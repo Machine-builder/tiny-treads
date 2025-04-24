@@ -1,7 +1,7 @@
 import random
 import string
 import typing
-from typing import Any, Dict, Union
+from typing import Any, Dict, Tuple, Union
 import pygame
 
 from . import network
@@ -24,13 +24,16 @@ class Entity():
     
     def __init__(
             self,
+            id: int,
             world: "World",
+            type_id: str,
             position: pygame.Vector2,
             size: pygame.Vector2,
             renderer: Union[EntityRenderer, None]):
     
-        self.world = world
-        self.id = self.world.assign_new_entity_id()
+        self.world: "World" = world
+        self.id: int = self.world.assign_new_entity_id() if id == -1 else id
+        self.type_id: str = type_id
         
         self.position = position
         self.velocity = pygame.Vector2(0, 0)
@@ -63,37 +66,14 @@ class Entity():
 
         self.renderer.draw(self, surface)
     
-    def get_attributes_dict(self) -> Dict[str, Any]:
-        return {
-            'position': self.position,
-            'velocity': self.velocity,
-            'drag': self.drag,
-            'size': self.size
-        }
-    
-    @staticmethod
-    def from_creation_event(event: network.Event):
-        assert event.event == 'ENTITY:CREATE', f'Attemting to initialize Entity instance from event of type "{event.event}", expected "ENTITY:CREATE"'
-        attributes: Dict[str, Any] = event.attributes
-        position: pygame.Vector2 = attributes['position']
-        velocity: pygame.Vector2 = attributes['velocity']
-        drag: float = attributes['drag']
-        size: pygame.Vector2 = attributes['size']
-        
-        e = Entity( position, size, EntityRenderer() )
-        e.velocity = velocity
-        e.drag = drag
-        
-        e.id = event.id
-        
-        return e
-    
-    def update_attributes(self, **kwargs):
-        if 'position' in kwargs:
-            self.position = kwargs['position']
-        if 'velocity' in kwargs:
-            self.velocity = kwargs['velocity']
-        if 'drag' in kwargs:
-            self.drag = kwargs['drag']
-        if 'size' in kwargs:
-            self.size = kwargs['size']
+    def update_from_snapshot(self, update: Tuple):
+        (id_,
+         position_x, position_y,
+         velocity_x, velocity_y,
+         rotation, rotational_velocity) = update
+        self.position.x = position_x
+        self.position.y = position_y
+        self.velocity.x = velocity_x
+        self.velocity.y = velocity_y
+        self.rotation = rotation
+        self.rotational_velocity = rotational_velocity

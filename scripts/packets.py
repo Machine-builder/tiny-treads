@@ -1,3 +1,5 @@
+import struct
+from typing import List, Tuple
 import pygame
 from . import engine
 
@@ -11,6 +13,7 @@ class PacketDefinitions:
     EntityDestroy = 302
     EntityUpdateAttr = 303
     EntityUpdatePhys = 304
+    EntityUpdatePhysMulti = 305
     
     ClientSetLocalEntity = 401
 
@@ -43,7 +46,28 @@ def get_packet_handler():
             return id, position.x, position.y, velocity.x, velocity.y, angle, angular_velocity
         def postprocess(id: int, x: float, y: float, vx: float, vy: float, a: float, va: float):
             return id, pygame.Vector2(x, y), pygame.Vector2(vx, vy), a, va
-        return '<Hddffff', preprocess, postprocess
+        return '<H2d4f', preprocess, postprocess
+
+    @packet_handler.register(PacketDefinitions.EntityUpdatePhysMulti)
+    def entity_update_phys_multi():
+        # id, vec2(x, y), vec2(vx, vy), angle, vangle
+        def packer(reference_time: float, entity_updates: List[Tuple[int, pygame.Vector2, pygame.Vector2, float, float]]):
+            result = b''
+            result += struct.pack('<dH', reference_time, len(entity_updates))
+            for update in entity_updates:
+                result += struct.pack('<H2d4f', update[0], update[1], update[2], update[3], update[4], update[5], update[6])
+            return result
+        
+        def unpacked(data: bytes):
+            updates = []
+            reference_time, count, = struct.unpack_from('<dH', data)
+            offset = 8+2
+            for _ in range(count):
+                updates.append(struct.unpack_from('<H2d4f', data, offset))
+                offset += 2 + 2*8 + 4*4 # one unsigned short, 2 doubles, 4 floats
+            return (reference_time, updates)
+        
+        return packer, unpacked
     
     @packet_handler.register(PacketDefinitions.ClientSetLocalEntity)
     def client_set_local_entity():
@@ -51,3 +75,18 @@ def get_packet_handler():
         return '<H?', None, None
     
     return packet_handler
+
+def test():
+    p = get_packet_handler()
+    
+    bytes_ = p.pack(engine.network.Event(
+        PacketDefinitions.EntityUpdatePhysMulti,
+        [
+            (0, pygame.Vector2(2, 3), pygame.Vector2(0.1, 0.5), 45, 0),
+            (1, pygame.Vector2(8, 2), pygame.Vector2(0.0, -5), -90, 0)
+        ]
+    ))
+    
+    event = p.unpack(bytes_)
+    
+    print(event.args)

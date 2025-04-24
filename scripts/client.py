@@ -1,19 +1,22 @@
+import math
 import time
 from typing import Union
 import pygame
 from pygame.locals import *
+
+from scripts.entity_registry import get_entity_registry
 from . import engine, packets
 
 class ClientGame:
     def __init__(self):
         pygame.init()
 
-        self.screen_size_ = pygame.Vector2(450, 300)
+        self.screen_size_ = pygame.Vector2(200, 140)
         
         self.screen = pygame.Surface(self.screen_size_)
-        self.display = pygame.display.set_mode(self.screen_size_*2)
+        self.display = pygame.display.set_mode(self.screen_size_*3)
         
-        self.font = pygame.font.SysFont('Arial', 16)
+        self.font = pygame.font.SysFont('Consolas', 16)
         
         pygame.display.set_caption('Tiny Treads')
         
@@ -30,10 +33,10 @@ class ClientGame:
         
         self.client_entity: Union[engine.Entity, None] = None
         
-        self.world = engine.World()
+        self.world = engine.World(get_entity_registry())
         
         self.timer_rtt = engine.Timer(5, True)
-        self.timer_world_update = engine.Timer(0.05)
+        self.timer_world_update = engine.Timer(0.1)
         
         self.rtt_started_at = -1
         self.last_recorded_rtt = 0
@@ -80,10 +83,16 @@ class ClientGame:
                 self.world.handle_network_event(event)
 
             keys_held = pygame.key.get_pressed()
-            input_vector = engine.input_utils.get_input_vector(keys_held, K_w, K_s, K_a, K_d)
+            input_vector = engine.input_utils.get_input_vector(keys_held, K_s, K_w, K_a, K_d)
             
             if self.client_entity is not None:
-                self.client_entity.velocity = input_vector*100
+                movement_speed = 800 if not keys_held[K_LSHIFT] else 1400
+                self.client_entity.rotation += input_vector.x*5*dt
+                velocity = pygame.Vector2(
+                    math.sin(-self.client_entity.rotation)*input_vector.y*movement_speed*dt,
+                    math.cos(-self.client_entity.rotation)*input_vector.y*movement_speed*dt
+                )
+                self.client_entity.velocity = velocity
 
             self.world.update(dt)
             
@@ -92,12 +101,13 @@ class ClientGame:
                 for event in send_events_tcp: self.client.send_event_tcp(event)
                 for event in send_events_udp: self.client.send_event_udp(event)
 
-            self.screen.fill((65, 65, 65))
+            self.screen.fill((150, 117, 72))
             self.world.draw(self.screen)
             self.display.blit(pygame.transform.scale(self.screen, self.display.size))
             
             debug_lines = [
-                f'RTT latest ... avg {int(self.last_recorded_rtt*1000)}ms ... {int(self.avg_rtt*1000)}ms'
+                f'RTT latest ... avg {int(self.last_recorded_rtt*1000)}ms ... {int(self.avg_rtt*1000)}ms',
+                (f'Latest Snapshot {self.world.snapshot_buffer[-1].time}' if len(self.world.snapshot_buffer) > 0 else 'No snapshots received')
             ]
             for i, line in enumerate(debug_lines):
                 self.display.blit(self.font.render(line, True, (255, 255, 255)), (10, 10+i*16))
