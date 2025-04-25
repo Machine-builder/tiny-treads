@@ -51,6 +51,9 @@ class Entity():
         self.rect.centerx = self.position.x
         self.rect.bottom = self.position.y
     
+    def process_inputs(self, dt: float, input_vector: pygame.Vector2, keys_held: pygame.key.ScancodeWrapper):
+        ...
+    
     def update(self, dt: float):
         self.position += self.velocity*dt 
         self.velocity -= self.velocity*self.drag*dt

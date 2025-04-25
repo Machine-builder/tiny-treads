@@ -6,6 +6,7 @@ from pygame.locals import *
 
 from scripts.entity_registry import get_entity_registry
 from . import engine, packets
+from .tank import TankEntity
 
 class ClientGame:
     def __init__(self):
@@ -31,7 +32,7 @@ class ClientGame:
         self.client = engine.network.HClient(server_ip_addr, server_port_tcp, server_port_udp, self._packet_handler)
         self.client.connect()
         
-        self.client_entity: Union[engine.Entity, None] = None
+        self.client_entity: Union[TankEntity, None] = None
         
         self.world = engine.World(get_entity_registry())
         
@@ -86,13 +87,7 @@ class ClientGame:
             input_vector = engine.input_utils.get_input_vector(keys_held, K_s, K_w, K_a, K_d)
             
             if self.client_entity is not None:
-                movement_speed = 800 if not keys_held[K_LSHIFT] else 1400
-                self.client_entity.rotation += input_vector.x*5*dt
-                velocity = pygame.Vector2(
-                    math.sin(-self.client_entity.rotation)*input_vector.y*movement_speed*dt,
-                    math.cos(-self.client_entity.rotation)*input_vector.y*movement_speed*dt
-                )
-                self.client_entity.velocity = velocity
+                self.client_entity.process_inputs(dt, input_vector, keys_held)
 
             self.world.update(dt)
             

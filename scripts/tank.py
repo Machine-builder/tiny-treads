@@ -23,6 +23,14 @@ class TankEntity(engine.Entity):
     def get_direction(self) -> pygame.Vector2:
         return pygame.Vector2(math.sin(-self.rotation), math.cos(-self.rotation))
     
+    def process_inputs(self, dt: float, input_vector: pygame.Vector2, keys_held: pygame.key.ScancodeWrapper):
+        movement_speed = 800 if not keys_held[pygame.K_LSHIFT] else 1400
+        self.rotation += input_vector.x*5*dt
+        self.velocity = pygame.Vector2(
+            math.sin(-self.rotation)*input_vector.y*movement_speed*dt,
+            math.cos(-self.rotation)*input_vector.y*movement_speed*dt
+        )
+    
     def update_visuals(self, dt: float):
         super().update_visuals(dt)
         
