@@ -437,7 +437,7 @@ class UDPBase(socket.socket):
         bytes = self.packet_handler.pack(event)
         self._send_bytes(bytes, addr)
     
-    def recv_event(self) -> Tuple[Event|None, Tuple[str,int]|None]:
+    def recv_event(self) -> Tuple[Union[Event, None], Union[Tuple[str,int], None]]:
         """Try recieve an event. This function may
         return None.
 
