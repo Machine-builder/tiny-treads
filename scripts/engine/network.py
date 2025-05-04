@@ -243,7 +243,7 @@ class TCPBase(object):
 class TCPServer(TCPBase):
     """a server class used to handle multiple socket connections"""
 
-    def __init__(self, bind_to: Union[tuple, int], packet_handler: PacketHandler):
+    def __init__(self, bind_to: Union[Tuple, int], packet_handler: PacketHandler):
         if isinstance(bind_to, int): bind_to = (Utility.get_local_ip(), bind_to)
         self.address = bind_to
         connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -254,7 +254,7 @@ class TCPServer(TCPBase):
         """listen for incoming connections with a backlog"""
         self.connection.listen(backlog)
 
-    def accept_connection(self) -> tuple:
+    def accept_connection(self) -> Tuple:
         """accept next incoming connection and returns the connection and address"""
         connection, address = self.connection.accept()
         return connection, address
@@ -268,7 +268,7 @@ class TCPClient(TCPBase):
         self.connected = False
         super().__init__(self.connection, packet_handler)
 
-    def connect_to(self, address: tuple):
+    def connect_to(self, address: Tuple):
         """try connect to an address, the connected attribute is
         a boolean which will be set to True if the connection is a success"""
         try:
@@ -418,31 +418,31 @@ class UDPBase(socket.socket):
         self.setblocking(False)
         self.packet_handler = packet_handler
     
-    def _send_bytes(self, packet: bytes, addr: tuple[str,int]):
+    def _send_bytes(self, packet: bytes, addr: Tuple[str,int]):
         self.sendto(packet, addr)
     
-    def _recv_bytes(self, bufsize: int=...) -> tuple[Union[bytes, None], Union[tuple[str,int], None]]:
+    def _recv_bytes(self, bufsize: int=...) -> Tuple[Union[bytes, None], Union[Tuple[str,int], None]]:
         if bufsize == ...:
             bufsize = Constants.UDP_PACKET_SIZE
         try: return self.recvfrom(bufsize)
         except BlockingIOError as e: return None, None
     
-    def send_event(self, event: Event, addr: tuple[str,int]):
+    def send_event(self, event: Event, addr: Tuple[str,int]):
         """Send an event to the specified UDP address.
 
         Args:
             event (Event): Event to send.
-            addr (tuple[str,int]): UDP address to send to.
+            addr (Tuple[str,int]): UDP address to send to.
         """
         bytes = self.packet_handler.pack(event)
         self._send_bytes(bytes, addr)
     
-    def recv_event(self) -> tuple[Event|None, tuple[str,int]|None]:
+    def recv_event(self) -> Tuple[Event|None, Tuple[str,int]|None]:
         """Try recieve an event. This function may
         return None.
 
         Returns:
-            tuple[Event|None, tuple[str,int]|None]: (Event, address) pair or None.
+            Tuple[Event|None, Tuple[str,int]|None]: (Event, address) pair or None.
         """
         bytes, addr = self._recv_bytes()
         if bytes is None:
@@ -450,12 +450,12 @@ class UDPBase(socket.socket):
         event = self.packet_handler.unpack(bytes)
         return event, addr
     
-    def pump(self) -> list[tuple[Event, tuple[str,int]]]:
+    def pump(self) -> List[Tuple[Event, Tuple[str,int]]]:
         """Retrieve a list of new events and the address(es)
         said events were sent by.
 
         Returns:
-            list[tuple[Event, tuple[str,int]]]: List of (Event, address) pairs.
+            List[Tuple[Event, Tuple[str,int]]]: List of (Event, address) pairs.
         """
         events = []
         while True:
@@ -468,7 +468,7 @@ class UDPServer(UDPBase):
     """UDP server, which is essentially a socket wrapper.
     Allows for sending and recieving events in a streamlined
     manner."""
-    def __init__(self, addr: tuple[str,int], packet_handler: PacketHandler):
+    def __init__(self, addr: Tuple[str,int], packet_handler: PacketHandler):
         super().__init__(packet_handler)
         self.addr = addr
         self.bind(self.addr)
@@ -477,12 +477,12 @@ class UDPClient(UDPBase):
     """UDP client, which is essentially a socket wrapper.
     Allows for sending and recieving events in a streamlined
     manner."""
-    def __init__(self, server_addr: tuple[str,int], packet_handler: PacketHandler):
+    def __init__(self, server_addr: Tuple[str,int], packet_handler: PacketHandler):
         super().__init__(packet_handler)
         self.server_addr = server_addr
         self.packet_handler = packet_handler
     
-    def set_server_addr(self, server_addr: tuple[str,int]):
+    def set_server_addr(self, server_addr: Tuple[str,int]):
         self.server_addr = server_addr
     
     def _send_bytes(self, packet: bytes):
@@ -509,7 +509,7 @@ class HSystemClient():
             self,
             conn:socket.socket,
             cid:str,
-            addr_tcp:tuple[str, int],
+            addr_tcp:Tuple[str, int],
             client_model):
         """The internal server-client client
         representation.
@@ -517,28 +517,28 @@ class HSystemClient():
         Args:
             conn (socket.socket): Socket connection.
             cid (str): Randomly assigned id.
-            addr_tcp (tuple[str, int]): TCP address.
+            addr_tcp (Tuple[str, int]): TCP address.
             client_model (_type_): _description_
         """
         self.conn = conn
         self.cid = cid
         self.addr_tcp = addr_tcp
-        self.addr_udp:tuple[str, int] = None
+        self.addr_udp:Tuple[str, int] = None
         self.model = client_model()
 
 @dataclass
 class HClientPumpResult:
-    events_tcp:list[Event]
-    events_udp:list[Event]
+    events_tcp:List[Event]
+    events_udp:List[Event]
     connected:bool
     connection_status:int=0
 
 @dataclass
 class HSystemPumpResult:
-    new_clients:list[HSystemClient]
-    disconnected_clients:list[HSystemClient]
-    events_tcp:list[Tuple[HSystemClient, Event]]
-    events_udp:list[Tuple[HSystemClient, Event]]
+    new_clients:List[HSystemClient]
+    disconnected_clients:List[HSystemClient]
+    events_tcp:List[Tuple[HSystemClient, Event]]
+    events_udp:List[Tuple[HSystemClient, Event]]
 
 class HSystem():
     def __init__(
@@ -572,7 +572,7 @@ class HSystem():
         else:
             self.system_tcp.send_event_to(conn, event)
     
-    def send_event_udp(self, event: Event, addr: tuple[str, int]=None):
+    def send_event_udp(self, event: Event, addr: Tuple[str, int]=None):
         if addr is None:
             # send to all
             for addr in self.cid_by_udp.keys():
